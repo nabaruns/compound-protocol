@@ -122,18 +122,33 @@ Functions and associated steps:
     2. Call repayBorrowFresh
 
 - [repayBorrowFresh](./CToken.sol#L852): Borrows are repaid by another user (possibly the borrower).
-    1. redeemAmount = redeemTokens x exchangeRateCurrent
-    2. Check if comptroller allows redeem
-    3. Verify market's block number equals current block number
+    1. Check if comptroller allows repayBorrow
+    2. Verify market's block number equals current block number
+    3. remember the original borrowerIndex for verification purposes
+    4. fetch the amount the `borrower` owes, with accumulated interest
+    5. If repayAmount == -1, repayAmount = accountBorrows, which is the borrower's entire balance
+    6. doTransferIn(`payer`, `repayAmount`)
+    7. accountBorrowsNew = accountBorrows - actualRepayAmount
+    8. totalBorrowsNew = totalBorrows - actualRepayAmount
+    9. emit RepayBorrow
 
 - [liquidateBorrowInternal](./CToken.sol#L929): The sender liquidates the borrowers collateral.
     1. accrueInterest
     2. Call repayBorrowFresh
 
 - [liquidateBorrowFresh](./CToken.sol#L955): The liquidator liquidates the borrowers collateral. The collateral seized is transferred to the liquidator.
-    1. redeemAmount = redeemTokens x exchangeRateCurrent
-    2. Check if comptroller allows redeem
-    3. Verify market's block number equals current block number
+    1. Check if comptroller allows liquidation
+    2. Verify market's block number equals current block number
+    3. Verify cTokenCollateral market's block number equals current block number
+    4. Fail if borrower = liquidator
+    5. Fail if repayAmount = 0
+    6. Fail if repayAmount = -1
+    7. repayBorrowFresh(liquidator, borrower, repayAmount)
+    8. calculate the number of collateral tokens that will be seized via comptroller
+    9. Revert if borrower collateral token balance < seizeTokens
+    10. If this cToken is also the collateral, run seizeInternal to avoid re-entrancy, otherwise make an external call
+    11. Revert if seize tokens fails
+    12. emit LiquidateBorrow(liquidator, borrower, actualRepayAmount, address(cTokenCollateral), seizeTokens)
 
 - [seizeInternal](./CToken.sol#L1061): Transfers collateral tokens (this market) to the liquidator.
     1. accrueInterest
